@@ -1,0 +1,44 @@
+{
+  "name": "marketshield-chrome-extension",
+  "version": "1.0.0",
+  "description": "Chrome extension for MarketShield - Protection against marketplace scams",
+  "main": "background.js",
+  "scripts": {
+    "lint": "eslint . --ext .js",
+    "lint:fix": "eslint . --ext .js --fix",
+    "build": "node scripts/build.js",
+    "test": "echo \"Tests would go here\" && exit 0",
+    "package": "node scripts/package.js",
+    "dev": "echo \"Use Chrome Developer Mode to load unpacked extension\"",
+    "validate": "node scripts/validate-manifest.js"
+  },
+  "keywords": [
+    "chrome-extension",
+    "marketplace",
+    "scam-protection",
+    "facebook-marketplace",
+    "craigslist",
+    "fraud-detection",
+    "security"
+  ],
+  "author": "MarketShield Team",
+  "license": "PROPRIETARY",
+  "homepage": "https://github.com/your-org/marketshield-extension",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/marketshield-extension.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/marketshield-extension/issues"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "eslint-config-standard": "^17.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-n": "^16.6.2",
+    "eslint-plugin-promise": "^6.1.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
