@@ -1,0 +1,344 @@
+/* MarketShield Chrome Extension - Content Script Styles */
+
+/* Safety Badge Styles */
+.marketshield-safety-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(4px);
+  cursor: help;
+  transition: all 0.2s ease;
+}
+
+.marketshield-safety-badge:hover {
+  transform: scale(1.05);
+}
+
+.marketshield-safe {
+  background: rgba(16, 185, 129, 0.9);
+  color: white;
+}
+
+.marketshield-caution {
+  background: rgba(245, 158, 11, 0.9);
+  color: white;
+}
+
+.marketshield-unsafe {
+  background: rgba(239, 68, 68, 0.9);
+  color: white;
+  animation: marketshield-pulse 2s infinite;
+}
+
+@keyframes marketshield-pulse {
+  0%, 100% { 
+    opacity: 0.9; 
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 1; 
+    transform: scale(1.02);
+  }
+}
+
+.marketshield-icon {
+  font-size: 12px;
+}
+
+.marketshield-text {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Unsafe Listing Highlight */
+.marketshield-unsafe-listing {
+  position: relative;
+  border: 2px solid #ef4444 !important;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.05) !important;
+}
+
+.marketshield-unsafe-listing::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 10px,
+    rgba(239, 68, 68, 0.1) 10px,
+    rgba(239, 68, 68, 0.1) 20px
+  );
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Branding */
+.marketshield-branding {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 10000;
+  transition: all 0.3s ease;
+  pointer-events: none;
+}
+
+.marketshield-branding.marketshield-hidden {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.marketshield-brand-content {
+  background: rgba(59, 130, 246, 0.95);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+
+.marketshield-shield {
+  font-size: 14px;
+}
+
+.marketshield-brand-text {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.marketshield-settings-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 10px;
+  color: white;
+  transition: background 0.2s ease;
+}
+
+.marketshield-settings-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Settings Modal */
+.marketshield-settings-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.marketshield-settings-content {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  width: 320px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.marketshield-settings-content h3 {
+  margin: 0 0 20px 0;
+  color: #1e293b;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.marketshield-settings-content label {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  cursor: pointer;
+  color: #475569;
+  font-size: 14px;
+}
+
+.marketshield-settings-content input[type="checkbox"] {
+  margin-right: 8px;
+  width: 16px;
+  height: 16px;
+}
+
+.marketshield-settings-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.marketshield-settings-actions button {
+  flex: 1;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.marketshield-settings-actions button:first-child {
+  background: #3b82f6;
+  color: white;
+}
+
+.marketshield-settings-actions button:first-child:hover {
+  background: #2563eb;
+}
+
+.marketshield-settings-actions button:nth-child(2) {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.marketshield-settings-actions button:nth-child(2):hover {
+  background: #cbd5e1;
+}
+
+.marketshield-settings-actions button:last-child {
+  background: #10b981;
+  color: white;
+}
+
+.marketshield-settings-actions button:last-child:hover {
+  background: #059669;
+}
+
+/* Loading States */
+.marketshield-loading {
+  position: relative;
+  overflow: hidden;
+}
+
+.marketshield-loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(59, 130, 246, 0.2),
+    transparent
+  );
+  animation: marketshield-shimmer 1.5s infinite;
+}
+
+@keyframes marketshield-shimmer {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .marketshield-branding {
+    bottom: 10px;
+    right: 10px;
+  }
+  
+  .marketshield-brand-content {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+  
+  .marketshield-settings-content {
+    width: 280px;
+    padding: 20px;
+  }
+  
+  .marketshield-safety-badge {
+    top: 4px;
+    right: 4px;
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+}
+
+/* Accessibility */
+.marketshield-safety-badge:focus,
+.marketshield-settings-btn:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Print Styles */
+@media print {
+  .marketshield-branding,
+  .marketshield-settings-modal,
+  .marketshield-safety-badge {
+    display: none !important;
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .marketshield-safety-badge {
+    border: 2px solid currentColor;
+    backdrop-filter: none;
+  }
+  
+  .marketshield-safe {
+    background: #000;
+    color: #0f0;
+  }
+  
+  .marketshield-caution {
+    background: #000;
+    color: #ff0;
+  }
+  
+  .marketshield-unsafe {
+    background: #000;
+    color: #f00;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .marketshield-safety-badge,
+  .marketshield-branding,
+  .marketshield-settings-btn {
+    transition: none;
+    animation: none;
+  }
+  
+  .marketshield-unsafe {
+    animation: none;
+  }
+  
+  .marketshield-loading::after {
+    animation: none;
+  }
+}
