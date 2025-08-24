@@ -51,6 +51,49 @@
   }
 }
 
+@keyframes marketshield-pulse-flag {
+  0%, 100% { 
+    opacity: 1; 
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 0.7; 
+    transform: scale(1.1);
+  }
+}
+
+/* Title Flag Styles */
+.marketshield-title-flag {
+  display: inline-block !important;
+  margin-right: 6px !important;
+  font-size: 12px !important;
+  line-height: 1 !important;
+  vertical-align: middle !important;
+  z-index: 999 !important;
+}
+
+.marketshield-flag-safe {
+  color: #10b981 !important;
+}
+
+.marketshield-flag-caution {
+  color: #f59e0b !important;
+}
+
+.marketshield-flag-unsafe {
+  color: #ef4444 !important;
+  animation: marketshield-pulse-flag 2s infinite;
+}
+
+.marketshield-flag-pending {
+  color: #9ca3af !important;
+  opacity: 0.6;
+}
+
+.marketshield-flag-default {
+  color: #9ca3af !important;
+}
+
 .marketshield-icon {
   font-size: 12px;
 }
