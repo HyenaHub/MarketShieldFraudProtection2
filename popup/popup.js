@@ -19,7 +19,15 @@ class MarketShieldPopup {
 
   bindEvents() {
     // Auth actions
-    document.getElementById('loginBtn').addEventListener('click', () => {
+    document.getElementById('googleLoginBtn').addEventListener('click', () => {
+      chrome.tabs.create({ url: `${MARKETSHIELD_APP_URL}/api/auth/google` });
+    });
+
+    document.getElementById('facebookLoginBtn').addEventListener('click', () => {
+      chrome.tabs.create({ url: `${MARKETSHIELD_APP_URL}/api/auth/facebook` });
+    });
+
+    document.getElementById('genericLoginBtn').addEventListener('click', () => {
       chrome.tabs.create({ url: `${MARKETSHIELD_APP_URL}/login` });
     });
 
