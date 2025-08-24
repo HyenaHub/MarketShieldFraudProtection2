@@ -4,16 +4,17 @@
   "version": "1.0.0",
   "description": "Protect yourself from scams on Facebook Marketplace and other online marketplaces with AI-powered detection and community reports.",
   "icons": {
-    "16": "icons/icon16.png",
-    "32": "icons/icon32.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
   },
   "permissions": [
     "activeTab",
     "storage",
     "tabs",
-    "scripting"
+    "scripting",
+    "contextMenus"
   ],
   "host_permissions": [
     "https://facebook.com/*",
