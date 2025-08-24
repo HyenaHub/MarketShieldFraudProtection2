@@ -1,0 +1,367 @@
+// MarketShield Chrome Extension - Craigslist Content Script
+
+class CraigslistProtection {
+  constructor() {
+    this.isInitialized = false;
+    this.scanQueue = new Set();
+    this.scannedUrls = new Map();
+    this.settings = {
+      enableAutoScan: true,
+      showSafetyBadges: true
+    };
+    
+    this.init();
+  }
+
+  async init() {
+    if (this.isInitialized) return;
+    
+    console.log('[MarketShield] Initializing Craigslist protection');
+    
+    await this.loadSettings();
+    this.setupMutationObserver();
+    this.addMarketShieldBranding();
+    this.scanVisibleListings();
+    
+    this.isInitialized = true;
+  }
+
+  async loadSettings() {
+    return new Promise((resolve) => {
+      chrome.storage.sync.get(['enableAutoScan', 'showSafetyBadges'], (result) => {
+        this.settings = {
+          enableAutoScan: result.enableAutoScan !== false,
+          showSafetyBadges: result.showSafetyBadges !== false
+        };
+        resolve();
+      });
+    });
+  }
+
+  setupMutationObserver() {
+    const observer = new MutationObserver((mutations) => {
+      let hasNewListings = false;
+      
+      mutations.forEach((mutation) => {
+        if (mutation.addedNodes.length > 0) {
+          mutation.addedNodes.forEach((node) => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              if (this.containsListingElements(node)) {
+                hasNewListings = true;
+              }
+            }
+          });
+        }
+      });
+
+      if (hasNewListings && this.settings.enableAutoScan) {
+        clearTimeout(this.scanTimeout);
+        this.scanTimeout = setTimeout(() => {
+          this.scanVisibleListings();
+        }, 1000);
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
+
+  containsListingElements(element) {
+    const listingSelectors = [
+      '.result-row',
+      '.posting',
+      '.cl-search-result',
+      'a[href*="/"]',
+      '.result-title'
+    ];
+
+    return listingSelectors.some(selector => 
+      element.matches && element.matches(selector) ||
+      element.querySelector && element.querySelector(selector)
+    );
+  }
+
+  scanVisibleListings() {
+    if (!this.settings.enableAutoScan) return;
+
+    const listingLinks = this.findListingLinks();
+    
+    listingLinks.forEach(link => {
+      const url = this.extractListingUrl(link);
+      if (url && !this.scannedUrls.has(url) && !this.scanQueue.has(url)) {
+        this.queueListingScan(url, link);
+      }
+    });
+  }
+
+  findListingLinks() {
+    const selectors = [
+      '.result-title',
+      '.result-row a',
+      '.posting a',
+      '.cl-search-result a',
+      'a[href*="/"]'
+    ];
+
+    const links = [];
+    selectors.forEach(selector => {
+      const elements = document.querySelectorAll(selector);
+      elements.forEach(el => {
+        const href = el.href || el.getAttribute('href');
+        if (href && this.isValidCraigslistUrl(href)) {
+          links.push(el);
+        }
+      });
+    });
+
+    return [...new Set(links)];
+  }
+
+  isValidCraigslistUrl(url) {
+    if (!url) return false;
+    
+    try {
+      const urlObj = new URL(url, window.location.origin);
+      const pathname = urlObj.pathname;
+      
+      // Check if it's a listing URL (not category or search)
+      return pathname.includes('.html') || 
+             /\/\d+\.html$/.test(pathname) ||
+             /\/[a-z]{3}\//.test(pathname); // Area code pattern
+    } catch {
+      return false;
+    }
+  }
+
+  extractListingUrl(element) {
+    const href = element.href || element.getAttribute('href');
+    if (!href) return null;
+
+    try {
+      const url = new URL(href, window.location.origin);
+      return url.href;
+    } catch (error) {
+      console.warn('[MarketShield] Invalid URL:', href);
+      return null;
+    }
+  }
+
+  async queueListingScan(url, element) {
+    this.scanQueue.add(url);
+
+    try {
+      const result = await this.scanListing(url);
+      this.scannedUrls.set(url, result);
+      
+      if (this.settings.showSafetyBadges) {
+        this.addSafetyBadge(element, result);
+      }
+
+      if (result?.analysis?.safetyRating === 'unsafe') {
+        this.highlightUnsafeListing(element, result);
+      }
+
+    } catch (error) {
+      console.warn('[MarketShield] Scan failed for:', url, error);
+    } finally {
+      this.scanQueue.delete(url);
+    }
+  }
+
+  async scanListing(url) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({
+        type: 'SCAN_LISTING',
+        data: { url: url }
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+
+        if (response && response.success) {
+          resolve(response.data);
+        } else {
+          reject(new Error(response?.error || 'Scan failed'));
+        }
+      });
+    });
+  }
+
+  addSafetyBadge(element, scanResult) {
+    const analysis = scanResult?.analysis;
+    if (!analysis) return;
+
+    const container = this.findBadgeContainer(element);
+    if (!container) return;
+
+    const existingBadge = container.querySelector('.marketshield-safety-badge');
+    if (existingBadge) {
+      existingBadge.remove();
+    }
+
+    const badge = document.createElement('div');
+    badge.className = `marketshield-safety-badge marketshield-${analysis.safetyRating}`;
+    badge.innerHTML = `
+      <span class="marketshield-icon">${this.getSafetyIcon(analysis.safetyRating)}</span>
+      <span class="marketshield-text">${analysis.safetyRating.toUpperCase()}</span>
+    `;
+
+    badge.title = `MarketShield: ${analysis.safetyRating} (${analysis.confidenceScore}% confidence)${
+      analysis.riskFactors?.length ? '\nRisk factors: ' + analysis.riskFactors.join(', ') : ''
+    }`;
+
+    container.style.position = 'relative';
+    container.appendChild(badge);
+  }
+
+  findBadgeContainer(element) {
+    // For Craigslist, try to find the result row or posting container
+    let container = element.closest('.result-row') || 
+                   element.closest('.posting') || 
+                   element.closest('.cl-search-result') ||
+                   element.parentElement;
+
+    if (!container) {
+      container = element;
+    }
+
+    return container;
+  }
+
+  highlightUnsafeListing(element, scanResult) {
+    const container = this.findBadgeContainer(element);
+    if (!container) return;
+
+    container.classList.add('marketshield-unsafe-listing');
+    
+    const originalOnClick = element.onclick;
+    element.onclick = (e) => {
+      const proceed = confirm(
+        `⚠️ MarketShield Warning ⚠️\n\n` +
+        `This listing has been flagged as potentially unsafe.\n` +
+        `Risk factors: ${scanResult.analysis.riskFactors?.join(', ') || 'Multiple issues detected'}\n\n` +
+        `Do you want to continue viewing this listing?`
+      );
+      
+      if (!proceed) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+      
+      if (originalOnClick) {
+        return originalOnClick.call(this, e);
+      }
+    };
+  }
+
+  getSafetyIcon(rating) {
+    switch (rating) {
+      case 'safe': return '✅';
+      case 'caution': return '⚠️';
+      case 'unsafe': return '🚨';
+      default: return '❓';
+    }
+  }
+
+  addMarketShieldBranding() {
+    if (document.getElementById('marketshield-branding')) return;
+
+    const branding = document.createElement('div');
+    branding.id = 'marketshield-branding';
+    branding.className = 'marketshield-branding';
+    branding.innerHTML = `
+      <div class="marketshield-brand-content">
+        <span class="marketshield-shield">🛡️</span>
+        <span class="marketshield-brand-text">Protected by MarketShield</span>
+        <button class="marketshield-settings-btn" id="marketshieldSettings">⚙️</button>
+      </div>
+    `;
+
+    document.body.appendChild(branding);
+
+    document.getElementById('marketshieldSettings').addEventListener('click', () => {
+      this.showQuickSettings();
+    });
+
+    setTimeout(() => {
+      branding.classList.add('marketshield-hidden');
+    }, 5000);
+  }
+
+  showQuickSettings() {
+    const modal = document.createElement('div');
+    modal.className = 'marketshield-settings-modal';
+    modal.innerHTML = `
+      <div class="marketshield-settings-content">
+        <h3>MarketShield Settings</h3>
+        <label>
+          <input type="checkbox" id="autoScanToggle" ${this.settings.enableAutoScan ? 'checked' : ''}>
+          Auto-scan listings
+        </label>
+        <label>
+          <input type="checkbox" id="safetyBadgesToggle" ${this.settings.showSafetyBadges ? 'checked' : ''}>
+          Show safety badges
+        </label>
+        <div class="marketshield-settings-actions">
+          <button id="saveSettings">Save</button>
+          <button id="cancelSettings">Cancel</button>
+          <button id="openDashboard">Open Dashboard</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    document.getElementById('saveSettings').addEventListener('click', () => {
+      this.settings.enableAutoScan = document.getElementById('autoScanToggle').checked;
+      this.settings.showSafetyBadges = document.getElementById('safetyBadgesToggle').checked;
+      
+      chrome.storage.sync.set({
+        enableAutoScan: this.settings.enableAutoScan,
+        showSafetyBadges: this.settings.showSafetyBadges
+      });
+      
+      modal.remove();
+    });
+
+    document.getElementById('cancelSettings').addEventListener('click', () => {
+      modal.remove();
+    });
+
+    document.getElementById('openDashboard').addEventListener('click', () => {
+      window.open('http://localhost:5000/dashboard', '_blank');
+      modal.remove();
+    });
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.remove();
+      }
+    });
+  }
+}
+
+// Initialize protection
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    new CraigslistProtection();
+  });
+} else {
+  new CraigslistProtection();
+}
+
+// Handle page navigation
+let lastUrl = location.href;
+new MutationObserver(() => {
+  const url = location.href;
+  if (url !== lastUrl) {
+    lastUrl = url;
+    setTimeout(() => {
+      new CraigslistProtection();
+    }, 1000);
+  }
+}).observe(document, { subtree: true, childList: true });
