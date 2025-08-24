@@ -1,0 +1,173 @@
+name: Build and Test Chrome Extension
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      working-directory: ./chrome-extension
+      
+    - name: Lint JavaScript files
+      run: npx eslint . --ext .js
+      working-directory: ./chrome-extension
+      
+    - name: Validate manifest.json
+      run: |
+        echo "Validating manifest.json structure..."
+        node -e "
+          const manifest = require('./manifest.json');
+          if (!manifest.manifest_version || !manifest.name || !manifest.version) {
+            throw new Error('Invalid manifest.json structure');
+          }
+          console.log('✓ Manifest validation passed');
+        "
+      working-directory: ./chrome-extension
+      
+    - name: Check file permissions
+      run: |
+        echo "Checking required files exist..."
+        test -f manifest.json || exit 1
+        test -f background.js || exit 1
+        test -f popup/popup.html || exit 1
+        test -f popup/popup.js || exit 1
+        test -f popup/popup.css || exit 1
+        test -f content-scripts/facebook-marketplace.js || exit 1
+        test -f content-scripts/craigslist.js || exit 1
+        test -f content-scripts/marketshield.css || exit 1
+        echo "✓ All required files present"
+      working-directory: ./chrome-extension
+
+  build-extension:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Create production build
+      run: |
+        echo "Creating production build..."
+        
+        # Create build directory
+        mkdir -p build
+        
+        # Copy all extension files
+        cp -r * build/ 2>/dev/null || true
+        
+        # Remove development files
+        rm -rf build/.git build/.github build/node_modules build/*.md
+        
+        # Update API endpoints for production (if PROD_API_URL is set)
+        if [ ! -z "$PROD_API_URL" ]; then
+          echo "Updating API endpoints to production..."
+          find build -name "*.js" -type f -exec sed -i "s|http://localhost:5000|$PROD_API_URL|g" {} +
+        fi
+        
+        echo "✓ Production build created"
+      working-directory: ./chrome-extension
+      env:
+        PROD_API_URL: ${{ secrets.PROD_API_URL }}
+        
+    - name: Create extension package
+      run: |
+        cd build
+        zip -r ../marketshield-extension-${{ github.sha }}.zip .
+        echo "✓ Extension package created"
+      working-directory: ./chrome-extension
+      
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: marketshield-extension-${{ github.sha }}
+        path: chrome-extension/marketshield-extension-${{ github.sha }}.zip
+        retention-days: 30
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Security audit
+      run: |
+        echo "Running security checks..."
+        
+        # Check for sensitive data in files
+        echo "Checking for API keys or secrets..."
+        if grep -r "sk_" . --exclude-dir=.git || grep -r "pk_" . --exclude-dir=.git; then
+          echo "❌ Found potential API keys in code"
+          exit 1
+        fi
+        
+        # Check manifest permissions
+        echo "Checking manifest permissions..."
+        node -e "
+          const manifest = require('./manifest.json');
+          const permissions = manifest.permissions || [];
+          const hostPermissions = manifest.host_permissions || [];
+          
+          console.log('Permissions:', permissions);
+          console.log('Host permissions:', hostPermissions);
+          
+          // Warn about broad permissions
+          if (permissions.includes('<all_urls>') || hostPermissions.includes('<all_urls>')) {
+            console.warn('⚠️  Extension requests access to all URLs');
+          }
+          
+          console.log('✓ Security scan completed');
+        "
+        
+        echo "✓ Security checks passed"
+      working-directory: ./chrome-extension
+
+  performance-test:
+    runs-on: ubuntu-latest
+    needs: build-extension
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Performance analysis
+      run: |
+        echo "Analyzing extension performance..."
+        
+        # Check file sizes
+        echo "File size analysis:"
+        find . -name "*.js" -o -name "*.css" -o -name "*.html" | while read file; do
+          size=$(du -h "$file" | cut -f1)
+          echo "  $file: $size"
+        done
+        
+        # Check total extension size
+        total_size=$(du -sh . | cut -f1)
+        echo "Total extension size: $total_size"
+        
+        # Warn if extension is too large
+        size_bytes=$(du -s . | cut -f1)
+        if [ $size_bytes -gt 10240 ]; then  # 10MB limit
+          echo "⚠️  Extension size exceeds recommended limit"
+        fi
+        
+        echo "✓ Performance analysis completed"
+      working-directory: ./chrome-extension
