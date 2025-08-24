@@ -210,6 +210,98 @@ class FacebookMarketplaceProtection {
     // Position the badge
     container.style.position = 'relative';
     container.appendChild(badge);
+
+    // Also add color flag next to listing title
+    this.addTitleFlag(element, analysis);
+  }
+
+  addTitleFlag(element, analysis) {
+    // Find the listing title within this element or its container
+    const titleSelectors = [
+      'h3 a[href*="/marketplace/item/"]',
+      'h2 a[href*="/marketplace/item/"]', 
+      'div[role="heading"] a',
+      'span[dir="auto"] a',
+      'a[href*="/marketplace/item/"] span',
+      'a[aria-label] span',
+      '[role="link"] span'
+    ];
+
+    let titleElement = null;
+    
+    // First try to find title within the element
+    for (const selector of titleSelectors) {
+      titleElement = element.querySelector(selector);
+      if (titleElement && titleElement.textContent?.trim()) break;
+    }
+
+    // If not found, try in parent containers
+    if (!titleElement) {
+      const parentElement = element.closest('[data-pagelet]') || 
+                           element.closest('div[role="article"]') ||
+                           element.closest('[data-testid^="marketplace"]');
+      if (parentElement) {
+        for (const selector of titleSelectors) {
+          titleElement = parentElement.querySelector(selector);
+          if (titleElement && titleElement.textContent?.trim()) break;
+        }
+      }
+    }
+
+    // Also try to find any link that contains marketplace/item
+    if (!titleElement) {
+      const marketplaceLink = element.closest('a[href*="/marketplace/item/"]') || 
+                             element.querySelector('a[href*="/marketplace/item/"]');
+      if (marketplaceLink) {
+        const textSpan = marketplaceLink.querySelector('span[dir="auto"]') ||
+                        marketplaceLink.querySelector('span') ||
+                        marketplaceLink.querySelector('[role="heading"]');
+        if (textSpan && textSpan.textContent?.trim()) {
+          titleElement = textSpan;
+        }
+      }
+    }
+
+    if (!titleElement) return;
+
+    // Remove existing flags to avoid duplicates
+    const existingFlags = document.querySelectorAll('.marketshield-title-flag');
+    existingFlags.forEach(flag => {
+      if (titleElement.contains(flag) || titleElement.parentElement?.contains(flag)) {
+        flag.remove();
+      }
+    });
+
+    // Create safety flag
+    const flag = document.createElement('span');
+    flag.className = `marketshield-title-flag marketshield-flag-${analysis.safetyRating}`;
+    flag.innerHTML = this.getSafetyFlagIcon(analysis.safetyRating);
+    flag.title = `MarketShield Safety: ${analysis.safetyRating.toUpperCase()} (${analysis.confidenceScore}% confidence)`;
+    flag.style.cssText = `
+      display: inline-block;
+      margin-right: 6px;
+      font-size: 12px;
+      line-height: 1;
+      vertical-align: middle;
+    `;
+
+    // Insert flag at the beginning of the title
+    if (titleElement.firstChild) {
+      titleElement.insertBefore(flag, titleElement.firstChild);
+    } else {
+      titleElement.appendChild(flag);
+    }
+  }
+
+  getSafetyFlagIcon(rating) {
+    const icons = {
+      'safe': '<span style="color: #10b981; font-weight: bold;">●</span>',
+      'caution': '<span style="color: #f59e0b; font-weight: bold;">●</span>', 
+      'unsafe': '<span style="color: #ef4444; font-weight: bold; animation: marketshield-pulse-flag 2s infinite;">●</span>',
+      'pending': '<span style="color: #9ca3af; font-weight: bold; opacity: 0.6;">●</span>',
+      'default': '<span style="color: #9ca3af; font-weight: bold;">●</span>'
+    };
+    return icons[rating] || icons['default'];
   }
 
   findBadgeContainer(element) {
