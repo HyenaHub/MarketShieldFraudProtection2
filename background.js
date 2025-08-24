@@ -117,16 +117,26 @@ function initializeMarketShieldProtection() {
 // API interaction functions
 async function handleListingScan(data, sendResponse) {
   try {
-    const settings = await chrome.storage.sync.get(['userAuthenticated', 'apiKey']);
-    
-    if (!settings.userAuthenticated) {
+    // First check if user is authenticated by making a test request
+    const authResponse = await fetch(`${MARKETSHIELD_API_BASE}/api/auth/status`, {
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!authResponse.ok || authResponse.status === 401) {
+      // Update local storage to reflect unauthenticated state
+      chrome.storage.sync.set({ userAuthenticated: false });
       sendResponse({ 
         success: false, 
-        error: 'Please log in to MarketShield to scan listings' 
+        error: 'Please log in to MarketShield to scan listings',
+        needsAuth: true
       });
       return;
     }
 
+    // User is authenticated, proceed with scan
     const response = await fetch(`${MARKETSHIELD_API_BASE}/api/scan`, {
       method: 'POST',
       headers: {
@@ -140,10 +150,17 @@ async function handleListingScan(data, sendResponse) {
     });
 
     if (!response.ok) {
+      if (response.status === 401) {
+        chrome.storage.sync.set({ userAuthenticated: false });
+        throw new Error('Please log in to MarketShield to scan listings');
+      }
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
     const result = await response.json();
+    
+    // Update authentication status on success
+    chrome.storage.sync.set({ userAuthenticated: true });
     
     // Save scan result locally
     saveScanResult({
@@ -168,8 +185,11 @@ async function handleListingScan(data, sendResponse) {
 
 async function getUserAuthStatus(sendResponse) {
   try {
-    const response = await fetch(`${MARKETSHIELD_API_BASE}/api/auth/user`, {
-      credentials: 'include'
+    const response = await fetch(`${MARKETSHIELD_API_BASE}/api/auth/status`, {
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json'
+      }
     });
     
     if (response.ok) {
