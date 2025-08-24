@@ -20,7 +20,7 @@ class MarketShieldPopup {
   bindEvents() {
     // Auth actions
     document.getElementById('loginBtn').addEventListener('click', () => {
-      chrome.tabs.create({ url: `${MARKETSHIELD_APP_URL}/api/login` });
+      chrome.tabs.create({ url: `${MARKETSHIELD_APP_URL}/login` });
     });
 
     // Scan actions
