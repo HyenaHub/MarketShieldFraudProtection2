@@ -185,12 +185,16 @@ async function handleListingScan(data, sendResponse) {
 
 async function getUserAuthStatus(sendResponse) {
   try {
+    console.log('[MarketShield] Checking auth status at:', `${MARKETSHIELD_API_BASE}/api/auth/status`);
+    
     const response = await fetch(`${MARKETSHIELD_API_BASE}/api/auth/status`, {
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json'
       }
     });
+    
+    console.log('[MarketShield] Auth check response:', response.status, response.statusText);
     
     if (response.ok) {
       const user = await response.json();
@@ -209,8 +213,20 @@ async function getUserAuthStatus(sendResponse) {
       sendResponse({ authenticated: false });
     }
   } catch (error) {
-    console.error('Auth check error:', error);
-    sendResponse({ authenticated: false, error: error.message });
+    console.error('[MarketShield] Auth check error:', error);
+    
+    // Detailed error logging
+    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      console.error('[MarketShield] Network error - check if MarketShield server is running at:', MARKETSHIELD_API_BASE);
+      console.error('[MarketShield] Make sure CORS is configured and localhost:5000 is accessible');
+    }
+    
+    chrome.storage.sync.set({ userAuthenticated: false });
+    
+    sendResponse({ 
+      authenticated: false, 
+      error: error.message || 'Authentication check failed'
+    });
   }
 }
 
