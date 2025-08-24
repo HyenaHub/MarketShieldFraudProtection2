@@ -216,39 +216,74 @@ function getScanHistory(sendResponse) {
 
 // Context menu setup
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-    id: 'scanWithMarketShield',
-    title: 'Scan with MarketShield',
-    contexts: ['page', 'link'],
-    documentUrlPatterns: [
-      'https://facebook.com/marketplace/*',
-      'https://www.facebook.com/marketplace/*',
-      'https://marketplace.facebook.com/*',
-      'https://craigslist.org/*',
-      'https://*.craigslist.org/*'
-    ]
-  });
-});
-
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === 'scanWithMarketShield') {
-    const urlToScan = info.linkUrl || info.pageUrl;
-    
-    chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: (url) => {
-        chrome.runtime.sendMessage({
-          type: 'SCAN_LISTING',
-          data: { url: url }
-        }, (response) => {
-          if (response.success) {
-            alert(`MarketShield Scan Complete!\nSafety Rating: ${response.data.analysis.safetyRating}\nConfidence: ${response.data.analysis.confidenceScore}%`);
-          } else {
-            alert(`Scan failed: ${response.error}`);
-          }
-        });
-      },
-      args: [urlToScan]
-    });
+  if (chrome.contextMenus) {
+    try {
+      chrome.contextMenus.create({
+        id: 'scanWithMarketShield',
+        title: 'Scan with MarketShield',
+        contexts: ['page', 'link'],
+        documentUrlPatterns: [
+          'https://facebook.com/marketplace/*',
+          'https://www.facebook.com/marketplace/*',
+          'https://marketplace.facebook.com/*',
+          'https://craigslist.org/*',
+          'https://*.craigslist.org/*'
+        ]
+      });
+    } catch (error) {
+      console.log('MarketShield: Context menu creation failed:', error);
+    }
   }
 });
+
+// Context menu click handler
+if (chrome.contextMenus && chrome.contextMenus.onClicked) {
+  chrome.contextMenus.onClicked.addListener((info, tab) => {
+    if (info.menuItemId === 'scanWithMarketShield') {
+      const urlToScan = info.linkUrl || info.pageUrl;
+      
+      if (chrome.scripting) {
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: (url) => {
+            // Show immediate feedback
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+              position: fixed; top: 20px; right: 20px; z-index: 10000;
+              background: #3b82f6; color: white; padding: 12px 16px;
+              border-radius: 8px; font-family: sans-serif; font-size: 14px;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            `;
+            notification.textContent = 'MarketShield: Scanning listing...';
+            document.body.appendChild(notification);
+
+            // Remove notification after 3 seconds
+            setTimeout(() => {
+              if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+              }
+            }, 3000);
+          },
+          args: [urlToScan]
+        }).then(() => {
+          // Process scan in background
+          handleScanRequest(urlToScan, (result) => {
+            if (result.success) {
+              // Show results via badge or notification
+              chrome.action.setBadgeText({ 
+                text: result.data.analysis.safetyRating === 'unsafe' ? '!' : '✓',
+                tabId: tab.id 
+              });
+              chrome.action.setBadgeBackgroundColor({
+                color: result.data.analysis.safetyRating === 'unsafe' ? '#ef4444' : 
+                       result.data.analysis.safetyRating === 'caution' ? '#f59e0b' : '#10b981'
+              });
+            }
+          });
+        }).catch((error) => {
+          console.error('MarketShield: Script execution failed:', error);
+        });
+      }
+    }
+  });
+}
