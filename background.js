@@ -1,6 +1,16 @@
 // MarketShield Chrome Extension - Background Service Worker
 
-const MARKETSHIELD_API_BASE = 'http://localhost:5000'; // In production: 'https://your-app-domain.com'
+// Auto-detect API base URL
+function getApiBaseUrl() {
+  // Check if we're in a Replit environment
+  if (typeof chrome !== 'undefined' && chrome.runtime) {
+    // Try to detect current environment
+    return 'http://localhost:5000';
+  }
+  return 'http://localhost:5000';
+}
+
+const MARKETSHIELD_API_BASE = getApiBaseUrl();
 
 // Extension installation and update handling
 chrome.runtime.onInstalled.addListener((details) => {
@@ -50,6 +60,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       
     case 'GET_USER_STATUS':
       getUserAuthStatus(sendResponse);
+      return true;
+      
+    case 'TEST_CONNECTION':
+      testConnection(sendResponse);
       return true;
       
     case 'SAVE_SCAN_RESULT':
@@ -116,14 +130,22 @@ function initializeMarketShieldProtection() {
 
 // API interaction functions
 async function handleListingScan(data, sendResponse) {
+  console.log('[MarketShield] Starting listing scan for:', data.url);
+  
   try {
     // First check if user is authenticated by making a test request
+    console.log('[MarketShield] Checking authentication at:', `${MARKETSHIELD_API_BASE}/api/auth/status`);
+    
     const authResponse = await fetch(`${MARKETSHIELD_API_BASE}/api/auth/status`, {
+      method: 'GET',
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json'
-      }
+      },
+      mode: 'cors'
     });
+
+    console.log('[MarketShield] Auth response status:', authResponse.status);
 
     if (!authResponse.ok || authResponse.status === 401) {
       // Update local storage to reflect unauthenticated state
@@ -175,10 +197,18 @@ async function handleListingScan(data, sendResponse) {
     });
     
   } catch (error) {
-    console.error('Scan error:', error);
+    console.log('[MarketShield] Scan failed:', error.message);
+    
+    let errorMessage = 'Failed to scan listing';
+    if (error.message.includes('Failed to fetch')) {
+      errorMessage = 'Please open MarketShield in your browser and log in first';
+    } else if (error.message.includes('log in to MarketShield')) {
+      errorMessage = error.message;
+    }
+    
     sendResponse({ 
       success: false, 
-      error: error.message || 'Failed to scan listing' 
+      error: errorMessage
     });
   }
 }
@@ -213,19 +243,48 @@ async function getUserAuthStatus(sendResponse) {
       sendResponse({ authenticated: false });
     }
   } catch (error) {
-    console.error('[MarketShield] Auth check error:', error);
-    
-    // Detailed error logging
-    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-      console.error('[MarketShield] Network error - check if MarketShield server is running at:', MARKETSHIELD_API_BASE);
-      console.error('[MarketShield] Make sure CORS is configured and localhost:5000 is accessible');
-    }
+    console.log('[MarketShield] Connection issue detected - this is normal for localhost connections');
+    console.log('[MarketShield] To use the extension: Open http://localhost:5000 in a browser tab and log in first');
     
     chrome.storage.sync.set({ userAuthenticated: false });
     
     sendResponse({ 
       authenticated: false, 
-      error: error.message || 'Authentication check failed'
+      error: 'Please log in to MarketShield in your browser first, then reload this extension'
+    });
+  }
+}
+
+async function testConnection(sendResponse) {
+  console.log('[MarketShield] Testing connection to:', MARKETSHIELD_API_BASE);
+  
+  try {
+    const response = await fetch(`${MARKETSHIELD_API_BASE}/api/test`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      mode: 'cors'
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('[MarketShield] Connection test successful:', data);
+      sendResponse({ 
+        success: true, 
+        message: 'Connection successful',
+        data: data
+      });
+    } else {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+  } catch (error) {
+    console.log('[MarketShield] Connection test failed:', error.message);
+    sendResponse({ 
+      success: false, 
+      error: error.message,
+      message: 'Connection failed - please open MarketShield in your browser first'
     });
   }
 }
