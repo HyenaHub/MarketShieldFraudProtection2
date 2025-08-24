@@ -1,0 +1,62 @@
+{
+  "manifest_version": 3,
+  "name": "MarketShield - Marketplace Scam Protection",
+  "version": "1.0.0",
+  "description": "Protect yourself from scams on Facebook Marketplace and other online marketplaces with AI-powered detection and community reports.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://facebook.com/*",
+    "https://www.facebook.com/*",
+    "https://m.facebook.com/*",
+    "https://marketplace.facebook.com/*",
+    "https://craigslist.org/*",
+    "https://*.craigslist.org/*",
+    "http://localhost:5000/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://facebook.com/marketplace/*",
+        "https://www.facebook.com/marketplace/*",
+        "https://m.facebook.com/marketplace/*",
+        "https://marketplace.facebook.com/*"
+      ],
+      "js": ["content-scripts/facebook-marketplace.js"],
+      "css": ["content-scripts/marketshield.css"],
+      "run_at": "document_end"
+    },
+    {
+      "matches": [
+        "https://craigslist.org/*",
+        "https://*.craigslist.org/*"
+      ],
+      "js": ["content-scripts/craigslist.js"],
+      "css": ["content-scripts/marketshield.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "MarketShield Protection"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*", "assets/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
